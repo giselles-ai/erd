@@ -13,7 +13,6 @@ on:
       - .github/workflows/github-pages.yml
   workflow_dispatch:
   schedule:
-  # Schedule: Runs at 9:00 AM JST every day.
   - cron: "0 0 * * *"
 
 concurrency:
@@ -22,7 +21,7 @@ concurrency:
 
 jobs:
   # NOTE: Following the example below, the job is structured into distinct build and deploy phases.
-  # see https://docs.github.com/ja/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+  # see https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
