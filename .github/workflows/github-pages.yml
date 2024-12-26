@@ -1,0 +1,84 @@
+name: Deploy GitHub Pages
+
+# see also https://github.com/giselles-ai/erd/settings/pages
+
+on:
+  # NOTE: Regardless of whether it's a push or a workflow_dispatch, we must specify the branch or tag for deployment in each environment.
+  # see https://github.com/giselles-ai/erd/settings/environments
+  push:
+    branches:
+      - gh-pages
+      - main
+    paths:
+      - .github/workflows/github-pages.yml
+  workflow_dispatch:
+  schedule:
+  - cron: "0 0 * * *"
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # NOTE: Following the example below, the job is structured into distinct build and deploy phases.
+  # see https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # Note: Required for Step 2: Prepare the input file.
+      postgres:
+        image: postgres:16.6-bookworm
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        env:
+          POSTGRES_PASSWORD: password
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          repository: giselles-ai/giselle
+
+      # Step 2: Prepare the input file
+      - name: Prepare the input file (dump.sql)
+        shell: bash
+        run: |
+          pg_dump_docker_image="postgres:16.6-bookworm" # ubuntu-latest pg_dump command is a bit old.
+          dbname="development"
+          echo "CREATE DATABASE ${dbname}" | psql "postgres://postgres:password@0.0.0.0:5432"
+          cat migrations/*.sql | psql "postgres://postgres:password@0.0.0.0:5432/${dbname}"
+          docker run --rm \
+            --network host \
+            ${pg_dump_docker_image} \
+            pg_dump --schema-only --no-privileges --no-owner \
+            "postgres://postgres:password@0.0.0.0:5432/${dbname}" > dump.sql
+
+      # Step 3: Generate ERD (Entity-Relationship Diagram) to `./_site`
+      - name: Generate ERD
+        run: npx @liam-hq/cli@latest erd build --input dump.sql --format postgres
+      - run: mv ./dist ./_site
+
+      # Step 4: Upload Artifact
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    permissions:
+      id-token: write
+      pages: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
