@@ -11,7 +11,6 @@ on:
       - main
     paths:
       - .github/workflows/github-pages.yml
-      - migrations/**/*.sql
   workflow_dispatch:
   schedule:
   # Schedule: Runs at 9:00 AM JST every day.
@@ -31,7 +30,7 @@ jobs:
     services:
       # Note: Required for Step 2: Prepare the input file.
       postgres:
-        image: postgres:15
+        image: postgres:16.6-bookworm
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
